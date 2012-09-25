@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:batch="http://www.springframework.org/schema/batch"
+	xmlns:oxm="http://www.springframework.org/schema/oxm"
+	xsi:schemaLocation="http://www.springframework.org/schema/oxm http://www.springframework.org/schema/oxm/spring-oxm-3.1.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/batch http://www.springframework.org/schema/batch/spring-batch.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.1.xsd">
+
+	<import resource="classpath:/coder36/sbent/jobs/sbent.xml"/>
+	<context:annotation-config/>
+
+
+	<job id="loadBigReturn"  incrementer="simpleIncrementer" xmlns="http://www.springframework.org/schema/batch">		
+		<step id="findBigReturn" next="decision">			
+			<tasklet ref="findBigReturnTasklet">
+				<listeners merge="true">
+					<listener ref="findBigReturnTasklet"/>
+				</listeners>
+			</tasklet>			
+		</step>	
+		<decision id="decision" decider="idDecider" >
+			<end on="FAILED" exit-code="No data to process" />
+			<next on="*" to="loadReturn"/>
+		</decision>
+		<step id="loadReturn" next="markOpen" parent="entStep">
+			<tasklet>
+				<chunk reader="loadReturnItemReader" writer="loadReturnItemWriter" skip-limit="10">
+					<skippable-exception-classes>
+						<include class="java.lang.Exception"/>
+					</skippable-exception-classes>
+				</chunk>			
+			</tasklet>							
+		</step>
+		<step id="markOpen">
+			<tasklet ref="markOpenTasklet"/>
+		</step>
+	</job>
+	
+	
+	<bean id="findBigReturnTasklet" class="coder36.sbent.hql.HqlLockRecordTasklet" scope="step">
+		<property name="hqlSelectQuery" value="select id from SReturnXml where status='NEW' order by id"/>
+		<property name="hqlLockQuery" value="update SReturnXml set status='OPEN' where id=:ids"/>
+		<property name="singleRow" value="true"/>
+		<property name="paramName" value="id"/>
+	</bean>	
+	
+	<bean id="loadReturnItemWriter" class="coder36.sbent.sample.jobs.loadbigreturn.LoadBigReturnItemWriter"/>
+	
+	<bean id="lobResource" class="coder36.sbent.sql.LobResource" scope="step">
+		<property name="lobSql" value="select xml from SReturnXml where id=#{jobExecutionContext['id']}"/>
+	</bean>
+	  
+	<bean id="loadReturnItemReader" class="coder36.sbent.xml.MultiStaxEventItemReader">
+		<property name="unmarshallerMap">
+			<map>
+				<entry key="header" value-ref="headerMarshaller"/>
+				<entry key="customer" value-ref="customerMarshaller"/>
+			</map>
+		</property>
+		<property name="resource" ref="lobResource"/>
+	</bean>
+	
+	<bean id="markOpenTasklet" class="coder36.sbent.hql.HqlUpdateTasklet" scope="step">
+		<property name="hql" value="update SReturnXml set status='OPEN' where id=#{jobExecutionContext['id']}"/>
+	</bean>
+		
+	<oxm:jaxb2-marshaller id="headerMarshaller" contextPath="coder36.sbent.sample.schema.header"/>
+	<oxm:jaxb2-marshaller id="customerMarshaller" contextPath="coder36.sbent.sample.schema.customer"/>
+
+</beans>

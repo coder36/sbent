@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:tx="http://www.springframework.org/schema/tx" xmlns:file="http://www.springframework.org/schema/integration/file"
+	xmlns:integration="http://www.springframework.org/schema/integration" xmlns:p="http://www.springframework.org/schema/p"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop.xsd
+		http://www.springframework.org/schema/integration http://www.springframework.org/schema/integration/spring-integration.xsd
+		http://www.springframework.org/schema/integration/file http://www.springframework.org/schema/integration/file/spring-integration-file-1.0.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/batch http://www.springframework.org/schema/batch/spring-batch-2.1.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.0.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-3.0.xsd">
+
+	<context:annotation-config/>
+	
+	<import resource="classpath:/coder36/sbent/jobs/sbent.xml"/>
+
+	<job id="processReturns" incrementer="simpleIncrementer" xmlns="http://www.springframework.org/schema/batch">
+		
+		<step id="findReturns" next="decision">
+			<tasklet ref="findReturnsTasklet" >
+				<listeners>
+					<listener ref="findReturnsTasklet"/>
+				</listeners>
+			</tasklet>
+		</step>	
+		<decision id="decision" decider="idsDecider" >
+			<end on="FAILED" exit-code="No data to process"/>
+			<next on="*" to="processBank"/>
+		</decision>
+		<step id="processBank" next="processCustomers" parent="entStep">
+			<tasklet>
+				<chunk reader="bankItemReader" writer="bankItemWriter"/>			
+			</tasklet>							
+		</step>
+		<step id="processCustomers" next ="processTransaction" parent="entStep">
+			<tasklet>
+				<chunk reader="customerItemReader" writer="customerItemWriter" />			
+			</tasklet>							
+		</step>		
+		<step id="processTransaction" next="clearStagedTransactions">
+			<partition partitioner="transactionPartitioner">
+				<handler grid-size="5" task-executor="taskExecutor"/>
+				<step parent="entStep">
+					<tasklet>
+						<chunk reader="transactionItemReader" writer="transactionItemWriter" />			
+					</tasklet>											
+				</step>
+			</partition>
+		</step>
+		<step id="clearStagedTransactions" next="clearStagedCustomers">
+			<tasklet ref="deleteTransactionsTasklet"/>
+		</step>	
+		<step id="clearStagedCustomers" next="clearStagedReturn">
+			<tasklet ref="deleteCustomersTasklet"/>
+		</step>			
+		<step id="clearStagedReturn" next="markComplete">
+			<tasklet ref="deleteReturnsTasklet"/>
+		</step>	
+		
+		<step id="markComplete">
+			<tasklet ref="markCompleteTasklet"/>
+		</step>		
+	</job>
+	
+	<bean id="findReturnsTasklet" class="coder36.sbent.hql.HqlLockRecordTasklet" scope="step">
+		<property name="hqlSelectQuery" value="select id from SReturnXml where status='OPEN' order by id"/>
+		<property name="hqlLockQuery" value="update SReturnXml set status='PROCESSING' where id in (:ids)"/>
+		<property name="singleRow" value="false"/>
+		<property name="paramName" value="ids"/>
+	</bean>
+	
+	<bean id="bankItemWriter" class="coder36.sbent.sample.jobs.processreturn.BankItemWriter"/>
+
+	<bean id="bankItemReader" class="org.springframework.batch.item.database.JdbcCursorItemReader" scope="step">
+		<property name="dataSource" ref="dataSource"/>
+		<property name="sql" value="
+				select r.id, b.id 
+				from 
+					sreturn r left outer join bank b on b.name = r.bankName 
+				where 
+					r.id in ( #{jobExecutionContext['ids']} ) 
+				order by r.id, b.id"/>
+		<property name="rowMapper" ref="rowMapper"/>
+	</bean>
+	
+	<bean id="customerItemReader" class="org.springframework.batch.item.database.JdbcCursorItemReader" scope="step">
+		<property name="dataSource" ref="dataSource"/>
+		<property name="sql" value="
+				select sret.id, scus.id, sret.bank_id, c.id
+				from					  
+					sreturn sret, 
+					scustomer scus left outer join customer c on c.nino = scus.nino
+				where 
+				    scus.ret_id = sret.id and
+					sret.id in ( #{jobExecutionContext['ids']} ) 
+				order by sret.id, scus.id, sret.bank_id, c.id"/>
+		<property name="rowMapper" ref="rowMapper"/>
+	</bean>	
+	
+	<bean id="customerItemWriter" class="coder36.sbent.sample.jobs.processreturn.CustomerItemWriter"/>
+ 
+	<bean id="transactionItemReader" class="org.springframework.batch.item.database.JdbcCursorItemReader" scope="step">
+		<property name="dataSource" ref="dataSource"/>
+		<property name="sql" value="
+				select strans.id, cus.id, sret.bank_id 
+				from
+					Customer cus,
+					SCustomer scus,
+					STransaction strans,
+					SReturn sret
+				where
+					cus.nino = scus.nino and
+					scus.id = strans.customer_id and
+					sret.id = scus.ret_id and
+					sret.id in ( #{jobExecutionContext['ids']} ) and
+					#{stepExecutionContext['partition']}
+				order by strans.id, cus.id, sret.bank_id"/>
+		<property name="rowMapper" ref="rowMapper"/>
+	</bean>
+	<bean id="transactionItemWriter" class="coder36.sbent.sample.jobs.processreturn.TransactionItemWriter"/>
+		
+	<bean id="transactionPartitioner" class="coder36.sbent.sql.TemplatePartitioner">
+		<property name="template" value="mod( sret.id, #gridSize#) = #partid#"/>
+	</bean>
+	
+	<bean id="markCompleteTasklet" class="coder36.sbent.hql.HqlUpdateTasklet" scope="step">
+		<property name="hql" value="update SReturnXml set status='COMPLETE' where id in ( #{jobExecutionContext['ids']} )"/>
+	</bean>	
+	
+	<bean id="deleteTransactionsTasklet" class="coder36.sbent.sql.SqlUpdateTasklet" scope="step">
+		<property name="sql" value="
+			delete from STransaction  
+          	where 
+            	customer_id in 
+              		( select cus.id 
+                	  from 
+                  		SCustomer cus, 
+	              		SReturn ret 
+	            	  where
+                		cus.ret_id in ( #{jobExecutionContext['ids']} )
+              )"/>
+   
+	</bean>	
+	
+	<bean id="deleteCustomersTasklet" class="coder36.sbent.sql.SqlUpdateTasklet" scope="step">
+		<property name="sql" value="
+			delete from SCustomer  
+          	where 
+            	ret_id in ( #{jobExecutionContext['ids']} )"/>
+	</bean>	
+	
+	<bean id="deleteReturnsTasklet" class="coder36.sbent.sql.SqlUpdateTasklet" scope="step">
+		<property name="sql" value="
+			delete from SReturn where id in ( #{jobExecutionContext['ids']} )"/>   
+	</bean>			
+	
+	<bean id="taskExecutor" class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor">
+		<property name="maxPoolSize" value="30"/>
+		<property name="corePoolSize" value="30"/>
+	</bean>		 	
+</beans>

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:tx="http://www.springframework.org/schema/tx" xmlns:file="http://www.springframework.org/schema/integration/file"
+	xmlns:integration="http://www.springframework.org/schema/integration" xmlns:p="http://www.springframework.org/schema/p"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop.xsd
+		http://www.springframework.org/schema/integration http://www.springframework.org/schema/integration/spring-integration.xsd
+		http://www.springframework.org/schema/integration/file http://www.springframework.org/schema/integration/file/spring-integration-file-1.0.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/batch http://www.springframework.org/schema/batch/spring-batch-2.1.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.0.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-3.0.xsd">
+
+	<import resource="classpath:/coder36/sbent/jobs/sbent.xml"/>
+	<context:annotation-config/>
+
+	<bean id="monthlyreturnMarshaller" class="org.springframework.oxm.jaxb.Jaxb2Marshaller">
+		<property name="contextPath" value="coder36.sbent.sample.schema.ret"/>
+		<property name="schema" value="classpath:xsd/return.xsd"/>
+	</bean>
+	
+
+	
+	<job id="loadReturn" incrementer="simpleIncrementer" xmlns="http://www.springframework.org/schema/batch">
+		<description>Loads XML into staging area.  Memory intensive.  To be used on small returns only</description>
+		<step id="loadData" next="" parent="entStep">
+			<tasklet>
+				<chunk commit-interval="1" reader="returnItemReader" writer="returnItemWriter" skip-limit="100">
+					<skippable-exception-classes>
+						<include class="org.springframework.oxm.UnmarshallingFailureException"/>
+					</skippable-exception-classes>
+				</chunk>			
+			</tasklet>		
+		</step>	
+	</job>
+
+
+
+
+
+
+
+	
+	<job id="loadFromQueue" incrementer="simpleIncrementer" xmlns="http://www.springframework.org/schema/batch">
+		<description>Load XML from AMQP queue. </description>
+		<step id="loadFromMyQueue" >
+			<tasklet>
+				<chunk commit-interval="10" reader="amqpItemReader" writer="returnXmlItemWriter"/>			
+			</tasklet>		
+		</step>	
+	</job>	
+
+	<bean id="returnItemWriter" class="coder36.sbent.sample.jobs.loadreturn.ReturnItemWriter"/>
+	<bean id="returnItemReader" class="org.springframework.batch.item.database.HibernateCursorItemReader" scope="step">
+		<property name="sessionFactory" ref="sessionFactory"/>
+		<property name="queryString" value="select s.id from SReturnXml s where s.status = 'NEW' order by s.id"/>
+	</bean>		
+	
+	<bean id="amqpItemReader" class="coder36.sbent.amqp.SimpleAmqpItemReader">
+		<property name="amqpTemplate" ref="returnAmqpTemplate"/>
+	</bean>
+	<bean id="returnXmlItemWriter" class="coder36.sbent.sample.jobs.loadreturn.ReturnXmlItemWriter"/>
+	
+			
+			
+</beans>

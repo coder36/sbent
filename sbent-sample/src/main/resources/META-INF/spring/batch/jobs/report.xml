@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:batch="http://www.springframework.org/schema/batch"
+	xmlns:oxm="http://www.springframework.org/schema/oxm"
+	xmlns:rabbit="http://www.springframework.org/schema/rabbit"
+	xsi:schemaLocation="http://www.springframework.org/schema/oxm http://www.springframework.org/schema/oxm/spring-oxm-3.1.xsd
+		http://www.springframework.org/schema/rabbit http://www.springframework.org/schema/rabbit/spring-rabbit-1.1.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/batch http://www.springframework.org/schema/batch/spring-batch.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.1.xsd">
+
+	<import resource="classpath:/coder36/sbent/jobs/sbent.xml"/>
+	<context:annotation-config/>
+
+
+	<job id="report"  incrementer="simpleIncrementer" xmlns="http://www.springframework.org/schema/batch">		
+		<step id="sendTicker" parent="entStep">			
+			<tasklet>
+				<chunk reader="tickerItemReader" writer="tickerItemWriter" >
+				</chunk>			
+			</tasklet>			
+		</step>
+	</job>
+
+	<bean id="tickerItemReader" class="org.springframework.batch.item.database.JdbcCursorItemReader" scope="step">
+		<property name="dataSource" ref="dataSource"/>
+		<property name="sql" value="
+				select c.nino, sum( t.amount )
+				from 
+					transaction t,
+					customer c
+				where 
+					t.customer_id = c.id
+				group by c.id 
+				order by c.id"/>
+		<property name="rowMapper" ref="objectRowMapper"/>
+	</bean>
+	
+	<bean id="tickerItemWriter" class="coder36.sbent.sample.jobs.report.TickerItemWriter">
+		<property name="amqpTemplate" ref="reportAmqpTemplate"/>
+	</bean>
+	
+</beans>

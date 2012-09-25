@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:batch="http://www.springframework.org/schema/batch"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/batch http://www.springframework.org/schema/batch/spring-batch.xsd">
+
+
+
+		<step id="entStep" abstract="true" xmlns="http://www.springframework.org/schema/batch">			
+			<tasklet>
+				<chunk commit-interval="500"/>				
+				<listeners>
+					<listener ref="errorListener"/>
+				</listeners>
+			</tasklet>			
+		</step>	
+		
+	<bean id="idsDecider" class="coder36.sbent.flow.ExecutionContextParamDecider">
+		<property name="paramName" value="ids"/>
+	</bean>
+	
+	<bean id="idDecider" class="coder36.sbent.flow.ExecutionContextParamDecider">
+		<property name="paramName" value="id"/>
+	</bean>		
+	
+	<bean id="rowMapper" class="coder36.sbent.sql.LongRowMapper"/>
+	<bean id="objectRowMapper" class="coder36.sbent.sql.ObjectRowMapper"/>
+
+	<bean id="simpleIncrementer" class="org.springframework.batch.core.launch.support.RunIdIncrementer"/>	
+	<bean id="errorListener" class="coder36.sbent.logging.ErrorLoggerListener" scope="step"/>
+		
+</beans>
