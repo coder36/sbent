@@ -10,13 +10,56 @@ import javax.persistence.*;
 public class SReturnXml {
 
 	@Id @GeneratedValue( strategy=GenerationType.AUTO)
-	public Long id;
+	private Long id;
 	
 	@Column( nullable=false)
 	@Lob
-	public String xml;
+	private String xml;
 	
 	@Column( nullable=false)
 	@Enumerated(EnumType.STRING)
-	public Status status = Status.NEW;
+	private Status status = Status.NEW;
+
+	/**
+	 * @return the id
+	 */
+	public Long getId() {
+		return id;
+	}
+
+	/**
+	 * @param id the id to set
+	 */
+	public void setId(Long id) {
+		this.id = id;
+	}
+
+	/**
+	 * @return the xml
+	 */
+	public String getXml() {
+		return xml;
+	}
+
+	/**
+	 * @param xml the xml to set
+	 */
+	public void setXml(String xml) {
+		this.xml = xml;
+	}
+
+	/**
+	 * @return the status
+	 */
+	public Status getStatus() {
+		return status;
+	}
+
+	/**
+	 * @param status the status to set
+	 */
+	public void setStatus(Status status) {
+		this.status = status;
+	}
+	
 }

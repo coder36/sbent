@@ -27,7 +27,7 @@ public class ReturnXmlItemWriter implements ItemWriter<String> {
 		
 		for( String xml : items ) {
 			SReturnXml sret = new SReturnXml();
-			sret.xml = xml;
+			sret.setXml( xml );
 			session.save( sret );			
 		}
 	}

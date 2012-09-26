@@ -142,7 +142,7 @@ public class ReturnBatchTest {
 		returnAmqpTemplate.convertAndSend( xml );	
 		jobLauncher.launchJob( "loadFromQueue" );	
 		SReturnXml s = (SReturnXml) session.createQuery( "select s from SReturnXml s" ).list().get(0);
-		assertEquals( xml, s.xml );		
+		assertEquals( xml, s.getXml() );		
 	}	
 	
 	/**
@@ -231,7 +231,7 @@ public class ReturnBatchTest {
 	private void loadTestData( String xml ) {
 		Session session = sessionFactory.openSession();
 		SReturnXml s = new SReturnXml();
-		s.xml = xml;
+		s.setXml( xml );
 		session.save(s);
 		session.flush();
 	}

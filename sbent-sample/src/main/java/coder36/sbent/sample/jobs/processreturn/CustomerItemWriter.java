@@ -35,7 +35,7 @@ public class CustomerItemWriter implements ItemWriter<Long[]> {
 		List<String> ninos = new ArrayList<String>();
 		for ( Object [] o: objs ) {
 			SCustomer scus = (SCustomer) o[1];
-			ninos.add( scus.nino );			
+			ninos.add( scus.getNino() );			
 		}
 		// look for customers which have already been saved since ItemReader drving query was ran		
 		List<Customer> customers = session.createQuery( "select c from Customer c where c.nino in (:ninos) " ).setParameterList( "ninos", ninos).list();		
@@ -43,7 +43,7 @@ public class CustomerItemWriter implements ItemWriter<Long[]> {
 		// create HashMap
 		Map<String,Customer> m = new HashMap<String,Customer>();
 		for( Customer c: customers ) {
-			m.put( c.nino, c );
+			m.put( c.getNino(), c );
 		}		
 				
 		for ( Object [] o : objs ) {			
@@ -52,13 +52,13 @@ public class CustomerItemWriter implements ItemWriter<Long[]> {
 			Customer cus = (Customer) o[3];
 			
 			// add to cache if need be
-			if ( cus != null ) m.put( scus.nino, cus );			
-			if ( cus == null && ! m.containsKey( scus.nino) )  m.put( scus.nino, new Customer() );			
+			if ( cus != null ) m.put( scus.getNino(), cus );			
+			if ( cus == null && ! m.containsKey( scus.getNino()) )  m.put( scus.getNino(), new Customer() );			
 			
-			cus = m.get( scus.nino );			 
-			cus.name = scus.name;
-			cus.nino = scus.nino;				
-			cus.banks.add( bank );
+			cus = m.get( scus.getNino() );			 
+			cus.setName( scus.getName() );
+			cus.setNino( scus.getNino() );				
+			cus.getBanks().add( bank );
 			session.save( cus );			
 		}
 	

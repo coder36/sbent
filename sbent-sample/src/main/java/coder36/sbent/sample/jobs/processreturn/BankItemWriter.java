@@ -34,7 +34,7 @@ public class BankItemWriter implements ItemWriter<Long[]> {
 		List<String> names = new ArrayList<String>(ids.size());
 		for ( Object [] o: objs ) {
 			SReturn sret = (SReturn) o[0];
-			names.add( sret.bankName); 
+			names.add( sret.getBankName()); 
 		}
 		// look for customers which have already been saved.  Need to do this as 
 		// ItemReader driving query will not know about any Bank objects which have already been
@@ -42,20 +42,20 @@ public class BankItemWriter implements ItemWriter<Long[]> {
 		List<Bank> bs = session.createQuery( "select b from Bank b where b.name in (:names) " ).setParameterList( "names", names).list();						
 		Map<String, Bank> banks = new HashMap<String,Bank>();
 		for( Bank b: bs ) {
-			banks.put( b.name, b);
+			banks.put( b.getName(), b);
 		}
 		
 		for ( Object [] z: objs ) {
 			SReturn ret = (SReturn) z[0];
-			if( !banks.containsKey( ret.bankName ) ) {
+			if( !banks.containsKey( ret.getBankName() ) ) {
 				Bank b = new Bank();
-				b.name = ret.bankName;
+				b.setName( ret.getBankName() );
 				session.save(b);
-				banks.put(b.name, b);
+				banks.put(b.getName(), b);
 			}
 						
-			Bank b = banks.get( ret.bankName);
-			ret.bank = b;							
+			Bank b = banks.get( ret.getBankName());
+			ret.setBank( b );							
 			session.save( ret );
 		}
 	}

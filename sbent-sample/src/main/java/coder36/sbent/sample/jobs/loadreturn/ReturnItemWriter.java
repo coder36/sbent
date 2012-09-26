@@ -33,9 +33,9 @@ public class ReturnItemWriter implements ItemWriter<Long> {
 		Session session = sessionFactory.getCurrentSession();
 		for( Long id : ids ) {
 			SReturnXml sret = (SReturnXml) session.get( SReturnXml.class, id);
-			Object o = unmarshaller.unmarshal( new StreamSource( new StringReader( sret.xml ) ) );
+			Object o = unmarshaller.unmarshal( new StreamSource( new StringReader( sret.getXml() ) ) );
 			Return r = (Return) o;
-			sret.status = Status.OPEN;
+			sret.setStatus( Status.OPEN );
 			session.save( convert( r ) );			
 			session.save( sret );
 		}
@@ -49,15 +49,15 @@ public class ReturnItemWriter implements ItemWriter<Long> {
 	private SReturn convert( Return r ) {
 		
 		SReturn sret = new SReturn();
-		sret.bankName = r.getHeader().getBankName();
+		sret.setBankName( r.getHeader().getBankName() );
 		
 		for ( Return.Customer c : r.getCustomer() ) {
 			SCustomer sc = new SCustomer();
-			sc.name = c.getName();
-			sc.nino = c.getNino();
+			sc.setName( c.getName() );
+			sc.setNino( c.getNino() );
 			for( Return.Customer.Transaction t: c.getTransaction() ) {
 				STransaction st = new STransaction();
-				st.amount = t.getAmount();
+				st.setAmount( t.getAmount() );
 				sc.addTransaction( st );
 			}
 			sret.addCustomer( sc );			

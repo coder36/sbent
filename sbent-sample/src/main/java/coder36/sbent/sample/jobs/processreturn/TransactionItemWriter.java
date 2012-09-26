@@ -40,9 +40,9 @@ public class TransactionItemWriter implements ItemWriter<Long[]> {
 			Bank bank = (Bank) o[2];
 			
 			Transaction trans = new Transaction();
-			trans.bank = bank;
-			trans.customer = cus;
-			trans.amount = strans.amount;	
+			trans.setBank( bank );
+			trans.setCustomer( cus );
+			trans.setAmount( strans.getAmount() );	
 			session.save( trans );
 		}
 		

@@ -53,8 +53,8 @@ public class LoadBigReturnItemWriter implements ItemWriter<Object> {
 			if ( o instanceof Header ) {
 				Header hdr = (Header)o;
 				ret = new SReturn();
-				ret.bankName = hdr.getBankName();
-				ret.periodEnd = XmlUtils.fromXml( hdr.getPeriodEnd() );
+				ret.setBankName( hdr.getBankName() );
+				ret.setPeriodEnd( XmlUtils.fromXml( hdr.getPeriodEnd() ) );
 				session.save( ret );
 			}
 			
@@ -62,15 +62,15 @@ public class LoadBigReturnItemWriter implements ItemWriter<Object> {
 			if ( o instanceof Customer ) {
 				Customer cus = (Customer) o;
 				SCustomer scus = new SCustomer();
-				scus.name = cus.getName();
-				scus.nino = cus.getNino();
+				scus.setName( cus.getName() );
+				scus.setNino( cus.getNino() );
 				for ( Customer.Transaction trans: cus.getTransaction() ) {
 					STransaction strans = new STransaction();
-					strans.amount = trans.getAmount();
+					strans.setAmount( trans.getAmount() );
 					scus.addTransaction( strans );
 					scus.addTransaction( strans );
 				}
-				scus.ret = ret;
+				scus.setRet( ret );
 				session.save( scus );
 			}
 		}
